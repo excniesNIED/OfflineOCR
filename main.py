@@ -1,105 +1,144 @@
-import tkinter
-import customtkinter as ctk
-from tkinter import filedialog, messagebox, Menu
-import fitz  # PyMuPDF
-from paddleocr import PaddleOCR
-import threading
 import os
 import sys
 import logging
 
-def resource_path(relative_path):
-    """ 获取资源文件的绝对路径, 适用于开发环境和 py2exe/PyInstaller """
-    try:
-        # PyInstaller 创建一个临时文件夹, 并把路径存储在 _MEIPASS
-        base_path = sys._MEIPASS
-    except AttributeError:
-        # py2exe/cx_Freeze 打包后, sys.frozen 为 True
-        if hasattr(sys, 'frozen'):
-            base_path = os.path.dirname(os.path.abspath(sys.executable))
-        else:
-            # 开发环境
-            base_path = os.path.abspath(".")
+# 立即切换工作目录并设置pypdfium2环境（必须在所有导入之前）
+if hasattr(sys, 'frozen'):
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+    os.chdir(exe_dir)
+    print(f"已切换到打包目录: {exe_dir}")
+    
+    # 立即设置pypdfium2相关的所有路径（在任何可能触发pypdfium2导入的库之前）
+    pdfium_dll_path = os.path.join(exe_dir, 'pdfium.dll')
+    pypdfium2_raw_path = os.path.join(exe_dir, 'pypdfium2_raw')
+    
+    if os.path.exists(pdfium_dll_path):
+        print(f"找到pdfium库文件: {pdfium_dll_path}")
+        
+        # 添加所有可能的DLL搜索路径
+        if hasattr(os, 'add_dll_directory'):
+            os.add_dll_directory(exe_dir)  # 根目录
+            if os.path.exists(pypdfium2_raw_path):
+                os.add_dll_directory(pypdfium2_raw_path)  # pypdfium2_raw目录
+        
+        # 设置PATH环境变量，包含所有可能的路径
+        current_path = os.environ.get('PATH', '')
+        new_paths = [exe_dir]
+        if os.path.exists(pypdfium2_raw_path):
+            new_paths.append(pypdfium2_raw_path)
+        
+        os.environ['PATH'] = os.pathsep.join(new_paths) + os.pathsep + current_path
+        print(f"已设置pypdfium2环境路径: {new_paths}")
+
+# 在导入CustomTkinter和pypdfium2之前修补文件系统访问
+def setup_path_interception():
+    """在导入前拦截并重定向模块的文件访问"""
+    if hasattr(sys, 'frozen'):
+        # 获取可执行文件所在目录
+        exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+        external_assets_dir = os.path.join(exe_dir, 'customtkinter', 'assets')
+        
+        if os.path.exists(external_assets_dir):
+            print(f"检测到打包环境，外部资源目录: {external_assets_dir}")
+
+            # 备份原始的os.path.exists和open函数
+            original_exists = os.path.exists
+            original_open = open
             
-    return os.path.join(base_path, relative_path)
+            def patched_exists(path):
+                """拦截CustomTkinter的路径检查，重定向到外部资源"""
+                if isinstance(path, str) and 'customtkinter' in path and 'assets' in path:
+                    if 'main.exe' in path and 'customtkinter' in path:
+                        corrected_path = os.path.join(exe_dir, path.split('main.exe\\')[-1])
+                        print(f"路径重定向: {path} -> {corrected_path}")
+                        return original_exists(corrected_path)
+                return original_exists(path)
+            
+            def patched_open(file, mode='r', **kwargs):
+                """拦截CustomTkinter的文件打开，重定向到外部资源"""
+                if isinstance(file, str) and 'customtkinter' in file and 'assets' in file:
+                    if 'main.exe' in file and 'customtkinter' in file:
+                        corrected_file = os.path.join(exe_dir, file.split('main.exe\\')[-1])
+                        print(f"文件打开重定向: {file} -> {corrected_file}")
+                        return original_open(corrected_file, mode, **kwargs)
+                return original_open(file, mode, **kwargs)
+            
+            # 应用修补
+            os.path.exists = patched_exists
+            
+            # 修补内置open函数，使用更兼容的方法
+            try:
+                import builtins
+                builtins.open = patched_open
+            except (AttributeError, TypeError):
+                # 备用方法
+                try:
+                    if isinstance(__builtins__, dict):
+                        __builtins__['open'] = patched_open
+                    else:
+                        setattr(__builtins__, 'open', patched_open)
+                except:
+                    print("警告: 无法修补内置open函数，可能影响主题加载")
+            
+            print("✓ 已安装CustomTkinter路径拦截器")
+            
+            # 现在安全导入CustomTkinter
+            import customtkinter as ctk_module
+            
+            return ctk_module
+    
+    # 非打包环境，正常导入
+    import customtkinter as ctk_module
+    return ctk_module
+
+# 设置拦截器并导入CustomTkinter
+ctk = setup_path_interception()
+
+from tkinter import filedialog, messagebox, Menu
+import fitz  # PyMuPDF
+from paddleocr import PaddleOCR
+import threading
 
 # --- 全局设置 ---
 ctk.set_appearance_mode("System")
-
-# 对于打包后的应用, 直接提供主题文件的绝对路径
-if hasattr(sys, 'frozen'):
-    theme_path = resource_path(os.path.join("customtkinter", "assets", "themes", "blue.json"))
-    if os.path.exists(theme_path):
-        ctk.set_default_color_theme(theme_path)
-    else:
-        # 在控制台打印致命错误, 因为没有主题UI会很难看
-        print(f"FATAL: Theme file not found at {theme_path}. The application cannot start correctly.")
-        ctk.set_default_color_theme("blue") # Fallback
-else:
-    # 开发模式下, customtkinter可以自己找到主题
-    ctk.set_default_color_theme("blue")
+ctk.set_default_color_theme("blue")
 
 # 禁用PaddleOCR的日志输出
 logging.getLogger('ppocr').setLevel(logging.WARNING)
 
-# --- OCR引擎初始化 (离线模式) ---
-# 使用旧模型结构路径
+# --- OCR引擎初始化 ---
 def init_ocr_engine():
     """初始化OCR引擎"""
     try:
-        # 检查模型文件是否存在
-        det_model_path = resource_path('models/det/ch/ch_PP-OCRv4_det_infer')
-        rec_model_path = resource_path('models/rec/ch/ch_PP-OCRv4_rec_infer')
-        cls_model_path = resource_path('models/cls/ch_ppocr_mobile_v2.0_cls_infer')
+        # 关键：根据可执行文件路径构建模型的绝对路径
+        if hasattr(sys, 'frozen'):
+            base_path = os.path.dirname(os.path.abspath(sys.executable))
+        else:
+            base_path = os.path.abspath('.')
         
-        print(f"检测模型路径: {det_model_path}")
-        print(f"识别模型路径: {rec_model_path}")
-        print(f"方向分类模型路径: {cls_model_path}")
+        det_model_path = os.path.join(base_path, 'models/det/ch/ch_PP-OCRv4_det_infer')
+        rec_model_path = os.path.join(base_path, 'models/rec/ch/ch_PP-OCRv4_rec_infer')
+        cls_model_path = os.path.join(base_path, 'models/cls/ch_ppocr_mobile_v2.0_cls_infer')
         
-        # 检查模型目录是否存在
-        if not os.path.exists(det_model_path):
-            raise FileNotFoundError(f"检测模型目录不存在: {det_model_path}")
-        if not os.path.exists(rec_model_path):
-            raise FileNotFoundError(f"识别模型目录不存在: {rec_model_path}")
-        if not os.path.exists(cls_model_path):
-            raise FileNotFoundError(f"方向分类模型目录不存在: {cls_model_path}")
-        
-        # 检查关键模型文件是否存在
-        det_model_file = os.path.join(det_model_path, 'inference.pdiparams')
-        rec_model_file = os.path.join(rec_model_path, 'inference.pdiparams')
-        cls_model_file = os.path.join(cls_model_path, 'inference.pdiparams')
-        
-        print(f"检测模型文件存在: {os.path.exists(det_model_file)}")
-        print(f"识别模型文件存在: {os.path.exists(rec_model_file)}")
-        print(f"方向分类模型文件存在: {os.path.exists(cls_model_file)}")
-        
-        if not os.path.exists(det_model_file):
-            raise FileNotFoundError(f"检测模型文件不存在: {det_model_file}")
-        if not os.path.exists(rec_model_file):
-            raise FileNotFoundError(f"识别模型文件不存在: {rec_model_file}")
-        if not os.path.exists(cls_model_file):
-            raise FileNotFoundError(f"方向分类模型文件不存在: {cls_model_file}")
-        
-        # 打印环境信息
-        print(f"当前工作目录: {os.getcwd()}")
-        print(f"sys.argv[0]: {sys.argv[0] if len(sys.argv) > 0 else 'N/A'}")
-        print(f"sys._MEIPASS: {getattr(sys, '_MEIPASS', 'N/A')}")
-        
-        # 使用resource_path函数确保打包后能找到模型文件
+        # 检查关键模型文件是否存在以进行验证
+        if not os.path.exists(os.path.join(det_model_path, 'inference.pdiparams')):
+            raise FileNotFoundError(f"检测模型文件不存在: {det_model_path}")
+        if not os.path.exists(os.path.join(rec_model_path, 'inference.pdiparams')):
+            raise FileNotFoundError(f"识别模型文件不存在: {rec_model_path}")
+        if not os.path.exists(os.path.join(cls_model_path, 'inference.pdiparams')):
+            raise FileNotFoundError(f"方向分类模型文件不存在: {cls_model_path}")
+            
         ocr_engine = PaddleOCR(
-            use_textline_orientation=True, 
+            use_angle_cls=True, 
             lang='ch',
-            text_detection_model_dir=det_model_path,
-            text_recognition_model_dir=rec_model_path,
-            textline_orientation_model_dir=cls_model_path
+            det_model_dir=det_model_path,
+            rec_model_dir=rec_model_path,
+            cls_model_dir=cls_model_path,
+            show_log=False # 禁用PaddleOCR的日志
         )
-        print("OCR引擎初始化成功")
         return ocr_engine
     except Exception as e:
-        # 捕获初始化异常，通常是模型路径问题
         print(f"OCR引擎初始化失败: {e}")
-        import traceback
-        traceback.print_exc()
         return None
 
 OCR_ENGINE = init_ocr_engine()
@@ -147,7 +186,7 @@ class App(ctk.CTk):
         
         self.zoom_var = ctk.StringVar(value="2.0")
         self.zoom_option = ctk.CTkOptionMenu(self.options_frame, values=["1.0", "1.5", "2.0", "2.5", "3.0"], 
-                                            variable=self.zoom_var)
+                                             variable=self.zoom_var)
         self.zoom_option.pack(side="left", padx=5, pady=10)
         
         self.lang_label = ctk.CTkLabel(self.options_frame, text="语言:")
@@ -155,7 +194,7 @@ class App(ctk.CTk):
         
         self.lang_var = ctk.StringVar(value="中英文")
         self.lang_option = ctk.CTkOptionMenu(self.options_frame, values=["中英文", "英文", "中文"], 
-                                            variable=self.lang_var)
+                                             variable=self.lang_var)
         self.lang_option.pack(side="left", padx=5, pady=10)
 
         # --- 结果文本框 ---
@@ -259,17 +298,16 @@ class App(ctk.CTk):
             
             # 获取用户设置
             zoom = float(self.zoom_var.get())
-            lang = self.lang_var.get()
             
             full_text = ""
             for i, page in enumerate(doc):
-                if not self.is_processing:  # 用户可能取消了操作
+                if not self.is_processing:
                     break
                     
                 # 1. PDF页面转图片
                 mat = fitz.Matrix(zoom, zoom)
                 pix = page.get_pixmap(matrix=mat)
-                img_bytes = pix.tobytes("png") # 转为字节流
+                img_bytes = pix.tobytes("png")
 
                 # 2. OCR识别图片
                 result = OCR_ENGINE.ocr(img_bytes, cls=True)
@@ -280,10 +318,10 @@ class App(ctk.CTk):
                     txts = [line[1][0] for line in result[0]]
                     page_text = "\n".join(txts)
 
-                full_text += f"--- 第 {i+1} 页 ---\n{page_text}\n\n"
+                full_text += f"--- 第 {i+1} 页 --- \n{page_text}\n\n"
                 
                 # 4. 在UI线程中更新内容
-                self.after(0, self.update_ui, f"--- 第 {i+1} 页 ---\n{page_text}\n\n", (i + 1) / total_pages, f"已完成 {i+1}/{total_pages} 页")
+                self.after(0, self.update_ui, f"--- 第 {i+1} 页 --- \n{page_text}\n\n", (i + 1) / total_pages, f"已完成 {i+1}/{total_pages} 页")
 
             doc.close()
             
@@ -295,7 +333,6 @@ class App(ctk.CTk):
         except Exception as e:
             self.after(0, lambda: messagebox.showerror("OCR处理失败", f"处理过程中发生错误:\n{str(e)}"))
         finally:
-            # 无论成功失败，都恢复按钮状态
             self.is_processing = False
             self.after(0, self.reset_ui)
 
@@ -312,11 +349,9 @@ class App(ctk.CTk):
         self.status_label.configure(text="准备就绪")
 
 if __name__ == "__main__":
-    # 检查OCR引擎是否初始化成功
     if not OCR_ENGINE:
-        print("OCR引擎初始化失败，程序无法启动")
         root = ctk.CTk()
-        root.withdraw()  # 隐藏主窗口
+        root.withdraw()
         messagebox.showerror("OCR引擎错误", "无法初始化OCR引擎，请检查模型文件路径是否正确。")
         root.destroy()
         sys.exit(1)
