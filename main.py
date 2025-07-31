@@ -2,33 +2,67 @@ import os
 import sys
 import logging
 
+# 设置日志输出到文件和控制台
+try:
+    if hasattr(sys, 'frozen'):
+        log_file = os.path.join(os.path.dirname(os.path.abspath(sys.executable)), 'debug.log')
+    else:
+        log_file = 'debug.log'
+    
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    print(f"日志文件: {log_file}")
+    logging.info("=" * 50)
+    logging.info("应用程序启动")
+    
+except Exception as e:
+    print(f"设置日志失败: {e}")
+
 # 立即切换工作目录并设置pypdfium2环境（必须在所有导入之前）
-if hasattr(sys, 'frozen'):
-    exe_dir = os.path.dirname(os.path.abspath(sys.executable))
-    os.chdir(exe_dir)
-    print(f"已切换到打包目录: {exe_dir}")
-    
-    # 立即设置pypdfium2相关的所有路径（在任何可能触发pypdfium2导入的库之前）
-    pdfium_dll_path = os.path.join(exe_dir, 'pdfium.dll')
-    pypdfium2_raw_path = os.path.join(exe_dir, 'pypdfium2_raw')
-    
-    if os.path.exists(pdfium_dll_path):
-        print(f"找到pdfium库文件: {pdfium_dll_path}")
+try:
+    if hasattr(sys, 'frozen'):
+        exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+        os.chdir(exe_dir)
+        print(f"已切换到打包目录: {exe_dir}")
+        logging.info(f"已切换到打包目录: {exe_dir}")
         
-        # 添加所有可能的DLL搜索路径
-        if hasattr(os, 'add_dll_directory'):
-            os.add_dll_directory(exe_dir)  # 根目录
+        # 立即设置pypdfium2相关的所有路径（在任何可能触发pypdfium2导入的库之前）
+        pdfium_dll_path = os.path.join(exe_dir, 'pdfium.dll')
+        pypdfium2_raw_path = os.path.join(exe_dir, 'pypdfium2_raw')
+        
+        if os.path.exists(pdfium_dll_path):
+            print(f"找到pdfium库文件: {pdfium_dll_path}")
+            logging.info(f"找到pdfium库文件: {pdfium_dll_path}")
+            
+            # 添加所有可能的DLL搜索路径
+            if hasattr(os, 'add_dll_directory'):
+                os.add_dll_directory(exe_dir)  # 根目录
+                logging.info(f"添加DLL搜索路径: {exe_dir}")
+                if os.path.exists(pypdfium2_raw_path):
+                    os.add_dll_directory(pypdfium2_raw_path)  # pypdfium2_raw目录
+                    logging.info(f"添加DLL搜索路径: {pypdfium2_raw_path}")
+            
+            # 设置PATH环境变量，包含所有可能的路径
+            current_path = os.environ.get('PATH', '')
+            new_paths = [exe_dir]
             if os.path.exists(pypdfium2_raw_path):
-                os.add_dll_directory(pypdfium2_raw_path)  # pypdfium2_raw目录
-        
-        # 设置PATH环境变量，包含所有可能的路径
-        current_path = os.environ.get('PATH', '')
-        new_paths = [exe_dir]
-        if os.path.exists(pypdfium2_raw_path):
-            new_paths.append(pypdfium2_raw_path)
-        
-        os.environ['PATH'] = os.pathsep.join(new_paths) + os.pathsep + current_path
-        print(f"已设置pypdfium2环境路径: {new_paths}")
+                new_paths.append(pypdfium2_raw_path)
+            
+            os.environ['PATH'] = os.pathsep.join(new_paths) + os.pathsep + current_path
+            print(f"已设置pypdfium2环境路径: {new_paths}")
+            logging.info(f"已设置pypdfium2环境路径: {new_paths}")
+        else:
+            logging.warning(f"未找到pdfium库文件: {pdfium_dll_path}")
+            
+except Exception as e:
+    print(f"初始化失败: {e}")
+    logging.error(f"初始化失败: {e}", exc_info=True)
 
 # 在导入CustomTkinter和pypdfium2之前修补文件系统访问
 def setup_path_interception():
@@ -92,12 +126,60 @@ def setup_path_interception():
     return ctk_module
 
 # 设置拦截器并导入CustomTkinter
-ctk = setup_path_interception()
+try:
+    logging.info("开始导入CustomTkinter")
+    print("开始导入CustomTkinter")
+    ctk = setup_path_interception()
+    logging.info("CustomTkinter导入成功")
+    print("CustomTkinter导入成功")
+except Exception as e:
+    logging.error(f"CustomTkinter导入失败: {e}", exc_info=True)
+    print(f"CustomTkinter导入失败: {e}")
+    raise
 
-from tkinter import filedialog, messagebox, Menu
-import fitz  # PyMuPDF
-from paddleocr import PaddleOCR
-import threading
+try:
+    logging.info("开始导入基础模块")
+    print("开始导入基础模块")
+    from tkinter import filedialog, messagebox, Menu
+    logging.info("tkinter模块导入成功")
+    print("tkinter模块导入成功")
+except Exception as e:
+    logging.error(f"tkinter模块导入失败: {e}", exc_info=True)
+    print(f"tkinter模块导入失败: {e}")
+    raise
+
+try:
+    logging.info("开始导入PyMuPDF")
+    print("开始导入PyMuPDF")
+    import fitz  # PyMuPDF
+    logging.info("PyMuPDF导入成功")
+    print("PyMuPDF导入成功")
+except Exception as e:
+    logging.error(f"PyMuPDF导入失败: {e}", exc_info=True)
+    print(f"PyMuPDF导入失败: {e}")
+    raise
+
+try:
+    logging.info("开始导入PaddleOCR")
+    print("开始导入PaddleOCR")
+    from paddleocr import PaddleOCR
+    logging.info("PaddleOCR导入成功")
+    print("PaddleOCR导入成功")
+except Exception as e:
+    logging.error(f"PaddleOCR导入失败: {e}", exc_info=True)
+    print(f"PaddleOCR导入失败: {e}")
+    raise
+
+try:
+    logging.info("开始导入threading")
+    print("开始导入threading")
+    import threading
+    logging.info("threading导入成功")
+    print("threading导入成功")
+except Exception as e:
+    logging.error(f"threading导入失败: {e}", exc_info=True)
+    print(f"threading导入失败: {e}")
+    raise
 
 # --- 全局设置 ---
 ctk.set_appearance_mode("System")
@@ -349,12 +431,35 @@ class App(ctk.CTk):
         self.status_label.configure(text="准备就绪")
 
 if __name__ == "__main__":
-    if not OCR_ENGINE:
-        root = ctk.CTk()
-        root.withdraw()
-        messagebox.showerror("OCR引擎错误", "无法初始化OCR引擎，请检查模型文件路径是否正确。")
-        root.destroy()
+    try:
+        logging.info("开始主程序")
+        print("开始主程序")
+        
+        if not OCR_ENGINE:
+            logging.error("OCR引擎初始化失败")
+            root = ctk.CTk()
+            root.withdraw()
+            messagebox.showerror("OCR引擎错误", "无法初始化OCR引擎，请检查模型文件路径是否正确。")
+            root.destroy()
+            sys.exit(1)
+        
+        logging.info("创建应用程序")
+        print("创建应用程序")
+        app = App()
+        
+        logging.info("启动主循环")
+        print("启动主循环")
+        app.mainloop()
+        
+    except Exception as e:
+        error_msg = f"应用程序发生致命错误: {e}"
+        print(error_msg)
+        logging.error(error_msg, exc_info=True)
+        
+        try:
+            import tkinter.messagebox as mb
+            mb.showerror("致命错误", error_msg)
+        except:
+            pass
+        
         sys.exit(1)
-    
-    app = App()
-    app.mainloop()
