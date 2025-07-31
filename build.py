@@ -8,6 +8,13 @@ def build_executable():
     """构建可执行文件"""
     print("开始构建可执行文件...")
     
+    # 检查是否在conda环境中
+    conda_prefix = os.environ.get('CONDA_PREFIX')
+    if conda_prefix:
+        print(f"检测到Conda环境: {conda_prefix}")
+    else:
+        print("警告：未检测到Conda环境，请确保在正确的环境中运行此脚本")
+    
     # 检查必要文件是否存在
     required_files = ['main.py']
     missing_files = []
@@ -41,29 +48,24 @@ def build_executable():
             print("构建已取消")
             return False
     
-    # 构建参数
+    # 检查图标文件
+    icon_path = 'app_icon.ico'
+    if not os.path.exists(icon_path):
+        print("未找到图标文件 app_icon.ico，将使用默认图标")
+        create_default_icon(icon_path)
+    
+    # 使用spec文件进行构建
+    spec_file = 'OfflinePDF-OCR.spec'
+    if not os.path.exists(spec_file):
+        print(f"错误：未找到spec文件 {spec_file}")
+        return False
+    
     build_args = [
-        'main.py',                    # 主程序
-        '--name', 'OfflinePDF-OCR',   # 可执行文件名
-        '--windowed',                 # 无控制台窗口模式
-        '--onefile',                  # 打包为单个文件
-        '--clean',                    # 清理临时文件
+        spec_file,
+        '--clean'
     ]
     
-    # 添加图标（如果存在）
-    if os.path.exists('icon.ico'):
-        build_args.extend(['--icon', 'icon.ico'])
-        print("使用自定义图标: icon.ico")
-    else:
-        print("未找到图标文件 icon.ico，将使用默认图标")
-    
-    # 添加模型文件
-    if os.path.exists('models'):
-        build_args.extend(['--add-data', 'models' + os.pathsep + 'models'])
-        print("添加模型文件夹到打包文件")
-    else:
-        print("警告：未找到 models 文件夹，打包的程序可能无法正常工作")
-    
+    print(f"使用spec文件进行构建: {spec_file}")
     print("\n构建参数:")
     for i, arg in enumerate(build_args):
         print(f"  {i+1:2d}. {arg}")
@@ -84,6 +86,22 @@ def build_executable():
     except Exception as e:
         print(f"\n✗ 构建失败: {e}")
         return False
+
+def create_default_icon(icon_path):
+    """创建默认图标文件"""
+    # 创建一个最小的ICO文件
+    with open(icon_path, 'wb') as f:
+        # 创建一个最小的有效的ICO文件头
+        f.write(b'\x00\x00')  # Reserved
+        f.write(b'\x01\x00')  # ICO type
+        f.write(b'\x01\x00')  # Number of images
+        f.write(b'\x10\x10')  # Width and height
+        f.write(b'\x00')      # Number of colors
+        f.write(b'\x00')      # Reserved
+        f.write(b'\x01\x00')  # Color planes
+        f.write(b'\x20\x00')  # Bits per pixel
+        f.write(b'\x6c\x00\x00\x00')  # Image size
+        f.write(b'\x16\x00\x00\x00')  # Image offset
 
 def clean_build():
     """清理构建文件"""
@@ -112,6 +130,15 @@ def clean_build():
             print(f"  已删除: {file_name}")
         except Exception as e:
             print(f"  删除 {file_name} 失败: {e}")
+    
+    # 删除图标文件（如果是我们创建的）
+    icon_path = 'app_icon.ico'
+    if os.path.exists(icon_path) and os.path.getsize(icon_path) < 100:
+        try:
+            os.remove(icon_path)
+            print(f"  已删除临时图标文件: {icon_path}")
+        except Exception as e:
+            print(f"  删除 {icon_path} 失败: {e}")
     
     print("清理完成！")
 
