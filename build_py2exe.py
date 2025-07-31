@@ -52,6 +52,10 @@ def build_executable():
             return False
     
     try:
+        # 先清理旧的构建文件
+        print("\n清理旧的构建文件...")
+        clean_build()
+        
         print("\n正在构建，请稍候...")
         # 使用py2exe构建
         import subprocess
@@ -59,8 +63,78 @@ def build_executable():
                               capture_output=True, text=True)
         
         if result.returncode == 0:
-            print("\n✓ 构建完成！")
-            print(f"可执行文件位置: {os.path.join(os.getcwd(), 'dist', 'main.exe')}")
+            print("\n✓ py2exe构建完成！")
+            
+                        # 后处理：确保CustomTkinter资源文件正确复制
+            print("正在进行后处理...")
+            dist_dir = os.path.join(os.getcwd(), 'dist')
+            try:
+                import customtkinter
+                ctk_path = os.path.dirname(customtkinter.__file__)
+                assets_path = os.path.join(ctk_path, 'assets')
+                
+                if os.path.exists(assets_path):
+                    target_ctk_dir = os.path.join(dist_dir, 'customtkinter')
+                    target_assets_dir = os.path.join(target_ctk_dir, 'assets')
+                    
+                    # 创建目标目录
+                    os.makedirs(target_assets_dir, exist_ok=True)
+                    
+                    # 复制assets目录
+                    if os.path.exists(target_assets_dir):
+                        shutil.rmtree(target_assets_dir)
+                    shutil.copytree(assets_path, target_assets_dir)
+                    print(f"✓ 成功复制CustomTkinter资源文件到: {target_assets_dir}")
+                    
+                    # 验证主题文件
+                    themes_dir = os.path.join(target_assets_dir, 'themes')
+                    if os.path.exists(themes_dir):
+                        theme_files = [f for f in os.listdir(themes_dir) if f.endswith('.json')]
+                        print(f"  主题文件: {', '.join(theme_files)}")
+            except Exception as e:
+                print(f"警告: 复制CustomTkinter资源文件时出错: {e}")
+            
+            print("\n检查构建结果...")
+            # 检查exe文件是否存在（使用上面定义的dist_dir）
+            exe_path = os.path.join(dist_dir, 'main.exe')
+            
+            if os.path.exists(exe_path):
+                print(f"可执行文件位置: {exe_path}")
+                
+                # 检查重要文件是否存在
+                ctk_assets = os.path.join(dist_dir, 'customtkinter', 'assets', 'themes')
+                python_dll = os.path.join(dist_dir, 'python39.dll')  # 根据python版本调整
+                
+                # 检查Python DLL（bundle_files=3时会有独立的DLL文件）
+                python_dlls = [f for f in os.listdir(dist_dir) if f.startswith('python') and f.endswith('.dll')]
+                if python_dlls:
+                    print(f"✓ Python库文件: {', '.join(python_dlls)}")
+                else:
+                    print("⚠ 警告: Python DLL文件未找到")
+                    
+                if os.path.exists(ctk_assets):
+                    print(f"✓ CustomTkinter主题文件: {ctk_assets}")
+                    theme_files = [f for f in os.listdir(ctk_assets) if f.endswith('.json')]
+                    print(f"  包含主题: {', '.join(theme_files)}")
+                else:
+                    print("⚠ 警告: CustomTkinter主题文件未找到")
+                    
+                print(f"\n你可以运行以下命令测试应用:")
+                print(f"cd dist && .\\main.exe")
+                
+            else:
+                # 查找可能的exe文件
+                if os.path.exists(dist_dir):
+                    exe_files = [f for f in os.listdir(dist_dir) if f.endswith('.exe')]
+                    if exe_files:
+                        print(f"可执行文件位置: {os.path.join(dist_dir, exe_files[0])}")
+                    else:
+                        print("未找到可执行文件，请检查dist目录")
+                        print("dist目录内容:")
+                        for item in os.listdir(dist_dir):
+                            print(f"  - {item}")
+                else:
+                    print("未找到dist目录")
             return True
         else:
             print(f"\n✗ 构建失败:")

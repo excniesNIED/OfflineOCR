@@ -8,19 +8,36 @@ import os
 import sys
 import logging
 
+def resource_path(relative_path):
+    """ 获取资源文件的绝对路径, 适用于开发环境和 py2exe/PyInstaller """
+    try:
+        # PyInstaller 创建一个临时文件夹, 并把路径存储在 _MEIPASS
+        base_path = sys._MEIPASS
+    except AttributeError:
+        # py2exe/cx_Freeze 打包后, sys.frozen 为 True
+        if hasattr(sys, 'frozen'):
+            base_path = os.path.dirname(os.path.abspath(sys.executable))
+        else:
+            # 开发环境
+            base_path = os.path.abspath(".")
+            
+    return os.path.join(base_path, relative_path)
+
 # --- 全局设置 ---
 ctk.set_appearance_mode("System")
-ctk.set_default_color_theme("blue")
 
-def resource_path(relative_path):
-    """获取资源文件的绝对路径"""
-    try:
-        # PyInstaller创建临时文件夹，将路径存储在_MEIPASS中
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    
-    return os.path.join(base_path, relative_path)
+# 对于打包后的应用, 直接提供主题文件的绝对路径
+if hasattr(sys, 'frozen'):
+    theme_path = resource_path(os.path.join("customtkinter", "assets", "themes", "blue.json"))
+    if os.path.exists(theme_path):
+        ctk.set_default_color_theme(theme_path)
+    else:
+        # 在控制台打印致命错误, 因为没有主题UI会很难看
+        print(f"FATAL: Theme file not found at {theme_path}. The application cannot start correctly.")
+        ctk.set_default_color_theme("blue") # Fallback
+else:
+    # 开发模式下, customtkinter可以自己找到主题
+    ctk.set_default_color_theme("blue")
 
 # 禁用PaddleOCR的日志输出
 logging.getLogger('ppocr').setLevel(logging.WARNING)
