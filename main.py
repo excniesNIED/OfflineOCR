@@ -27,20 +27,42 @@ logging.getLogger('ppocr').setLevel(logging.WARNING)
 
 # --- OCR引擎初始化 (离线模式) ---
 # 使用旧模型结构路径
-try:
-    # 使用resource_path函数确保打包后能找到模型文件
-    OCR_ENGINE = PaddleOCR(
-        use_textline_orientation=True, 
-        lang='ch',
-        text_detection_model_dir=resource_path('./models/det/ch/ch_PP-OCRv4_det_infer/'),
-        text_recognition_model_dir=resource_path('./models/rec/ch/ch_PP-OCRv4_rec_infer/'),
-        textline_orientation_model_dir=resource_path('./models/cls/ch_ppocr_mobile_v2.0_cls_infer/')
-    )
-    print("OCR引擎初始化成功")
-except Exception as e:
-    # 捕获初始化异常，通常是模型路径问题
-    print(f"OCR引擎初始化失败: {e}")
-    OCR_ENGINE = None
+def init_ocr_engine():
+    """初始化OCR引擎"""
+    try:
+        # 检查模型文件是否存在
+        det_model_path = resource_path('./models/det/ch/ch_PP-OCRv4_det_infer/')
+        rec_model_path = resource_path('./models/rec/ch/ch_PP-OCRv4_rec_infer/')
+        cls_model_path = resource_path('./models/cls/ch_ppocr_mobile_v2.0_cls_infer/')
+        
+        print(f"检测模型路径: {det_model_path}")
+        print(f"识别模型路径: {rec_model_path}")
+        print(f"方向分类模型路径: {cls_model_path}")
+        
+        # 检查模型目录是否存在
+        if not os.path.exists(det_model_path):
+            raise FileNotFoundError(f"检测模型目录不存在: {det_model_path}")
+        if not os.path.exists(rec_model_path):
+            raise FileNotFoundError(f"识别模型目录不存在: {rec_model_path}")
+        if not os.path.exists(cls_model_path):
+            raise FileNotFoundError(f"方向分类模型目录不存在: {cls_model_path}")
+        
+        # 使用resource_path函数确保打包后能找到模型文件
+        ocr_engine = PaddleOCR(
+            use_textline_orientation=True, 
+            lang='ch',
+            text_detection_model_dir=det_model_path,
+            text_recognition_model_dir=rec_model_path,
+            textline_orientation_model_dir=cls_model_path
+        )
+        print("OCR引擎初始化成功")
+        return ocr_engine
+    except Exception as e:
+        # 捕获初始化异常，通常是模型路径问题
+        print(f"OCR引擎初始化失败: {e}")
+        return None
+
+OCR_ENGINE = init_ocr_engine()
 
 class App(ctk.CTk):
     def __init__(self):

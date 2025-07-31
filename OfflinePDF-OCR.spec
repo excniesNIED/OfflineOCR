@@ -7,9 +7,25 @@ block_cipher = None
 
 # 获取当前目录
 current_dir = os.path.dirname(os.path.abspath(sys.argv[0])) if hasattr(sys, 'argv') and sys.argv else os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
+print(f"Current directory: {current_dir}")
 
 # 添加模型文件路径
 models_path = os.path.join(current_dir, 'models')
+print(f"Models path: {models_path}")
+
+# 检查模型目录是否存在
+if os.path.exists(models_path):
+    print("Models directory found")
+    # 列出模型子目录
+    for root, dirs, files in os.walk(models_path):
+        level = root.replace(models_path, '').count(os.sep)
+        indent = ' ' * 2 * level
+        print(f'{indent}{os.path.basename(root)}/')
+        subindent = ' ' * 2 * (level + 1)
+        for file in files:
+            print(f'{subindent}{file}')
+else:
+    print("Warning: Models directory not found")
 
 # 添加paddle和paddleocr相关路径
 paddle_path = None
@@ -81,8 +97,7 @@ a = Analysis(
         'paddleocr.ppocr.utils.utility',
         'paddleocr.ppocr.utils.visual',
         'paddleocr.ppocr.utils.poly_nms',
-        'paddleocr.ppocr.utils.poly_nms_utils',
-        'paddleocr.ppocr.utils.',
+        'paddleocr.ppocr.utils.poly_nms_utils'
     ],
     hookspath=[],
     hooksconfig={},

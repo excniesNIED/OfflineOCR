@@ -4,6 +4,31 @@ import sys
 import shutil
 from pathlib import Path
 
+def check_models():
+    """检查模型文件是否存在"""
+    print("检查模型文件...")
+    model_dirs = [
+        'models/det/ch/ch_PP-OCRv4_det_infer',
+        'models/rec/ch/ch_PP-OCRv4_rec_infer', 
+        'models/cls/ch_ppocr_mobile_v2.0_cls_infer'
+    ]
+    
+    missing_models = []
+    for model_dir in model_dirs:
+        if not os.path.exists(model_dir):
+            missing_models.append(model_dir)
+        else:
+            print(f"✓ 找到模型目录: {model_dir}")
+    
+    if missing_models:
+        print("✗ 以下模型文件缺失:")
+        for model in missing_models:
+            print(f"  - {model}")
+        return False
+    else:
+        print("✓ 所有模型文件都已找到")
+        return True
+
 def build_executable():
     """构建可执行文件"""
     print("开始构建可执行文件...")
@@ -28,21 +53,7 @@ def build_executable():
         return False
     
     # 检查模型文件
-    model_dirs = [
-        'models/det/ch/ch_PP-OCRv4_det_infer',
-        'models/rec/ch/ch_PP-OCRv4_rec_infer', 
-        'models/cls/ch_ppocr_mobile_v2.0_cls_infer'
-    ]
-    
-    missing_models = []
-    for model_dir in model_dirs:
-        if not os.path.exists(model_dir):
-            missing_models.append(model_dir)
-    
-    if missing_models:
-        print("警告：以下模型文件缺失:")
-        for model in missing_models:
-            print(f"  - {model}")
+    if not check_models():
         response = input("\n是否继续构建？(y/N): ")
         if response.lower() not in ['y', 'yes']:
             print("构建已取消")
