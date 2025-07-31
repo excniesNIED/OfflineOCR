@@ -115,27 +115,33 @@ a = Analysis(
         'paddleocr',
         'paddle',
         'paddlex',
-        # 添加缺失模块的隐藏导入（如果确定不需要可以删除）
-        'paddleocr.ppocr.utils.e2e_utils',
-        'paddleocr.ppocr.utils.logging',
-        'paddleocr.ppocr.utils.stats',
-        'paddleocr.ppocr.utils.utility',
-        'paddleocr.ppocr.utils.visual',
-        'paddleocr.ppocr.utils.poly_nms',
-        'paddleocr.ppocr.utils.poly_nms_utils',
-        # 添加缺失的模块
-        'paddle.utils.run_load_lib'  # 可能需要的paddle隐藏导入
+         # 添加customtkinter相关依赖
+        'customtkinter',
+        'customtkinter.windows',
+        'customtkinter.windows.widgets',
+        'customtkinter.windows.widgets.core',
+        'customtkinter.windows.widgets.core_widget_classes',
+        'customtkinter.windows.widgets.font',
+        'customtkinter.windows.widgets.image',
+        'customtkinter.windows.widgets.scaling',
+        'customtkinter.windows.widgets.theme',
+        'customtkinter.windows.widgets.utility',
+        'customtkinter.windows.widgets.appearance_mode',
+        'tkinter',
+        'tkinter.constants',
+        'tkinter.filedialog',
+        'tkinter.messagebox',
+        'tkinter.font'
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # 排除不需要的模块
+        # 排除不需要的模块，但保留tkinter
         'sklearn',
         'pysqlite2',
         'MySQLdb',
         'darkdetect',  # 排除macOS特定模块
-        'tkinter',  # 排除tkinter，因为使用customtkinter
         'PyQt5',  # 排除可能的GUI相关模块
         'matplotlib'  # 排除绘图相关模块
     ],
