@@ -1,0 +1,20 @@
+# 离线PDF-OCR工具依赖包
+# 安装命令: pip install -r requirements.txt
+
+# PaddlePaddle深度学习框架
+paddlepaddle>=2.0.0
+
+# PaddleOCR库，用于OCR识别
+paddleocr>=2.0.1
+
+# PyMuPDF库，用于PDF处理
+PyMuPDF>=1.18.0
+
+# CustomTkinter，用于现代化GUI界面
+customtkinter>=5.0.0
+
+# PyInstaller，用于打包为exe文件
+pyinstaller>=5.0.0
+
+# 可选依赖（如果需要更好的显示效果）
+# opencv-python>=4.0.0
