@@ -16,5 +16,5 @@ customtkinter>=5.0.0
 # PyInstaller，用于打包为exe文件
 pyinstaller>=5.0.0
 
-# 可选依赖（如果需要更好的显示效果）
-# opencv-python>=4.0.0
+# py2exe，用于Windows平台打包为exe文件
+py2exe>=0.10.0.0
