@@ -31,9 +31,9 @@ def init_ocr_engine():
     """初始化OCR引擎"""
     try:
         # 检查模型文件是否存在
-        det_model_path = resource_path('./models/det/ch/ch_PP-OCRv4_det_infer/')
-        rec_model_path = resource_path('./models/rec/ch/ch_PP-OCRv4_rec_infer/')
-        cls_model_path = resource_path('./models/cls/ch_ppocr_mobile_v2.0_cls_infer/')
+        det_model_path = resource_path('models/det/ch/ch_PP-OCRv4_det_infer')
+        rec_model_path = resource_path('models/rec/ch/ch_PP-OCRv4_rec_infer')
+        cls_model_path = resource_path('models/cls/ch_ppocr_mobile_v2.0_cls_infer')
         
         print(f"检测模型路径: {det_model_path}")
         print(f"识别模型路径: {rec_model_path}")
@@ -46,6 +46,18 @@ def init_ocr_engine():
             raise FileNotFoundError(f"识别模型目录不存在: {rec_model_path}")
         if not os.path.exists(cls_model_path):
             raise FileNotFoundError(f"方向分类模型目录不存在: {cls_model_path}")
+        
+        # 检查关键模型文件是否存在
+        det_model_file = os.path.join(det_model_path, 'inference.pdiparams')
+        rec_model_file = os.path.join(rec_model_path, 'inference.pdiparams')
+        cls_model_file = os.path.join(cls_model_path, 'inference.pdiparams')
+        
+        if not os.path.exists(det_model_file):
+            raise FileNotFoundError(f"检测模型文件不存在: {det_model_file}")
+        if not os.path.exists(rec_model_file):
+            raise FileNotFoundError(f"识别模型文件不存在: {rec_model_file}")
+        if not os.path.exists(cls_model_file):
+            raise FileNotFoundError(f"方向分类模型文件不存在: {cls_model_file}")
         
         # 使用resource_path函数确保打包后能找到模型文件
         ocr_engine = PaddleOCR(
@@ -60,6 +72,8 @@ def init_ocr_engine():
     except Exception as e:
         # 捕获初始化异常，通常是模型路径问题
         print(f"OCR引擎初始化失败: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 OCR_ENGINE = init_ocr_engine()
@@ -272,30 +286,14 @@ class App(ctk.CTk):
         self.status_label.configure(text="准备就绪")
 
 if __name__ == "__main__":
-    # 检查模型文件是否存在
-    model_dirs = [
-        './models/det/ch/ch_PP-OCRv4_det_infer/',
-        './models/rec/ch/ch_PP-OCRv4_rec_infer/',
-        './models/cls/ch_ppocr_mobile_v2.0_cls_infer/'
-    ]
-    
-    missing_models = []
-    for model_dir in model_dirs:
-        if not os.path.exists(resource_path(model_dir)):
-            missing_models.append(model_dir)
-    
-    if missing_models and not getattr(sys, 'frozen', False):
-        # 仅在非打包模式下检查模型
-        root = ctk.CTk()
-        root.withdraw()  # 隐藏主窗口
-        messagebox.showerror("模型文件缺失", f"以下模型文件缺失:\n" + "\n".join(missing_models) + "\n\n请确保模型文件已正确放置。")
-        root.destroy()
-    elif OCR_ENGINE: # 只有引擎成功加载才运行App
-        app = App()
-        app.mainloop()
-    else:
-        # 创建一个临时的CTk实例来显示错误消息
+    # 检查OCR引擎是否初始化成功
+    if not OCR_ENGINE:
+        print("OCR引擎初始化失败，程序无法启动")
         root = ctk.CTk()
         root.withdraw()  # 隐藏主窗口
         messagebox.showerror("OCR引擎错误", "无法初始化OCR引擎，请检查模型文件路径是否正确。")
         root.destroy()
+        sys.exit(1)
+    
+    app = App()
+    app.mainloop()

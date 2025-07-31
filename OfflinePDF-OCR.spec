@@ -78,6 +78,12 @@ if paddlex_path and os.path.exists(paddlex_path):
     if os.path.exists(version_file):
         datas.append((version_file, 'paddlex'))
 
+# 检查图标文件
+icon_path = os.path.join(current_dir, 'app_icon.ico')
+if not os.path.exists(icon_path):
+    print(f"Warning: Icon file not found at {icon_path}")
+    icon_path = None
+
 a = Analysis(
     ['main.py'],
     pathex=[current_dir],
@@ -90,14 +96,7 @@ a = Analysis(
         'sklearn.utils._cython_blas',
         'sklearn.neighbors.typedefs',
         'sklearn.neighbors.quad_tree',
-        'sklearn.tree._utils',
-        'paddleocr.ppocr.utils.e2e_utils',
-        'paddleocr.ppocr.utils.logging',
-        'paddleocr.ppocr.utils.stats',
-        'paddleocr.ppocr.utils.utility',
-        'paddleocr.ppocr.utils.visual',
-        'paddleocr.ppocr.utils.poly_nms',
-        'paddleocr.ppocr.utils.poly_nms_utils'
+        'sklearn.tree._utils'
     ],
     hookspath=[],
     hooksconfig={},
@@ -131,5 +130,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='app_icon.ico' if os.path.exists('app_icon.ico') else None
+    icon=icon_path
 )
