@@ -52,12 +52,21 @@ def init_ocr_engine():
         rec_model_file = os.path.join(rec_model_path, 'inference.pdiparams')
         cls_model_file = os.path.join(cls_model_path, 'inference.pdiparams')
         
+        print(f"检测模型文件存在: {os.path.exists(det_model_file)}")
+        print(f"识别模型文件存在: {os.path.exists(rec_model_file)}")
+        print(f"方向分类模型文件存在: {os.path.exists(cls_model_file)}")
+        
         if not os.path.exists(det_model_file):
             raise FileNotFoundError(f"检测模型文件不存在: {det_model_file}")
         if not os.path.exists(rec_model_file):
             raise FileNotFoundError(f"识别模型文件不存在: {rec_model_file}")
         if not os.path.exists(cls_model_file):
             raise FileNotFoundError(f"方向分类模型文件不存在: {cls_model_file}")
+        
+        # 打印环境信息
+        print(f"当前工作目录: {os.getcwd()}")
+        print(f"sys.argv[0]: {sys.argv[0] if len(sys.argv) > 0 else 'N/A'}")
+        print(f"sys._MEIPASS: {getattr(sys, '_MEIPASS', 'N/A')}")
         
         # 使用resource_path函数确保打包后能找到模型文件
         ocr_engine = PaddleOCR(

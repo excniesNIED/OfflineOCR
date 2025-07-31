@@ -59,7 +59,29 @@ except ImportError as e:
     print(f"Could not import paddlex: {e}")
 
 # 收集数据文件
-datas = [(models_path, 'models')]
+datas = []
+
+# 添加模型文件（使用更精确的映射）
+if os.path.exists(models_path):
+    # 添加整个models目录
+    datas.append((models_path, 'models'))
+    print("添加模型文件夹到打包文件")
+    
+    # 显式添加模型子目录（解决可能的路径问题）
+    model_subdirs = [
+        ('models/det/ch/ch_PP-OCRv4_det_infer', 'models/det/ch/ch_PP-OCRv4_det_infer'),
+        ('models/rec/ch/ch_PP-OCRv4_rec_infer', 'models/rec/ch/ch_PP-OCRv4_rec_infer'),
+        ('models/cls/ch_ppocr_mobile_v2.0_cls_infer', 'models/cls/ch_ppocr_mobile_v2.0_cls_infer')
+    ]
+    
+    for src, dest in model_subdirs:
+        if os.path.exists(src):
+            datas.append((src, dest))
+            print(f"添加模型子目录: {src} -> {dest}")
+        else:
+            print(f"警告：模型子目录不存在: {src}")
+else:
+    print("警告：未找到 models 文件夹，打包的程序可能无法正常工作")
 
 # 添加paddle相关数据文件
 if paddle_path and os.path.exists(os.path.join(paddle_path, 'libs')):
@@ -93,15 +115,30 @@ a = Analysis(
         'paddleocr',
         'paddle',
         'paddlex',
-        'sklearn.utils._cython_blas',
-        'sklearn.neighbors.typedefs',
-        'sklearn.neighbors.quad_tree',
-        'sklearn.tree._utils'
+        # 添加缺失模块的隐藏导入（如果确定不需要可以删除）
+        'paddleocr.ppocr.utils.e2e_utils',
+        'paddleocr.ppocr.utils.logging',
+        'paddleocr.ppocr.utils.stats',
+        'paddleocr.ppocr.utils.utility',
+        'paddleocr.ppocr.utils.visual',
+        'paddleocr.ppocr.utils.poly_nms',
+        'paddleocr.ppocr.utils.poly_nms_utils',
+        # 添加缺失的模块
+        'paddle.utils.run_load_lib'  # 可能需要的paddle隐藏导入
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        # 排除不需要的模块
+        'sklearn',
+        'pysqlite2',
+        'MySQLdb',
+        'darkdetect',  # 排除macOS特定模块
+        'tkinter',  # 排除tkinter，因为使用customtkinter
+        'PyQt5',  # 排除可能的GUI相关模块
+        'matplotlib'  # 排除绘图相关模块
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

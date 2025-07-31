@@ -73,18 +73,15 @@ def build_executable():
     
     build_args = [
         spec_file,
-        '--clean'
+        '--clean',
+        # 禁用确认
+        '--noconfirm'
     ]
     
     print(f"使用spec文件进行构建: {spec_file}")
     print("\n构建参数:")
     for i, arg in enumerate(build_args):
         print(f"  {i+1:2d}. {arg}")
-    
-    response = input("\n是否开始构建？(Y/n): ")
-    if response.lower() in ['n', 'no']:
-        print("构建已取消")
-        return False
     
     try:
         print("\n正在构建，请稍候...")
