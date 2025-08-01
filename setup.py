@@ -1,3 +1,5 @@
+# setup.py (最终修复版)
+
 from setuptools import setup
 import sys
 import os
@@ -46,9 +48,9 @@ if os.path.exists('app_icon.ico'):
 # 3. 关键：将整个 customtkinter 库作为数据文件复制
 print("正在收集CustomTkinter库文件...")
 try:
+    # 注意：这里的 import 会优先找到您项目根目录下的 customtkinter 文件夹
     import customtkinter
     ctk_path = os.path.dirname(customtkinter.__file__)
-    # 复制所有文件，确保库的完整性
     data_files.extend(find_data_files(ctk_path, 'customtkinter', patterns=['*']))
     print(f"将完整的CustomTkinter库作为数据文件复制，源路径: {ctk_path}")
 except ImportError:
@@ -80,6 +82,9 @@ setup(
     description='Offline PDF OCR Tool',
     author='EPIBoly',
     
+    # 关键改动：明确告诉 setuptools 我们的项目只是一个单独的模块
+    py_modules=['main'],
+
     options={
         'py2exe': {
             'bundle_files': 3,
@@ -96,7 +101,7 @@ setup(
                 'pypdfium2_raw',
             ],
             'excludes': [
-                'customtkinter',  # 关键：禁止py2exe捆绑它
+                'customtkinter',
                 'PyQt5',
                 'matplotlib',
             ],
@@ -107,5 +112,5 @@ setup(
         'icon_resources': [(1, 'app_icon.ico')] if os.path.exists('app_icon.ico') else []
     }],
     data_files=data_files,
-    zipfile=None,  # 关键：禁止生成 library.zip
+    zipfile=None,
 )
