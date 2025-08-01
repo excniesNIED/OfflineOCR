@@ -94,7 +94,7 @@ if sys.platform.startswith('win'):
                     'paddleocr',
                     'paddle',
                     'paddlex',
-                    'customtkinter',  # 恢复正常打包customtkinter
+                    'customtkinter',
                     'pypdfium2',
                     'pypdfium2_raw',
                 ],
@@ -112,7 +112,7 @@ if sys.platform.startswith('win'):
             'icon_resources': [(1, 'app_icon.ico')] if os.path.exists('app_icon.ico') else []
         }],
         data_files=data_files,
-        zipfile=None,  # 确保不创建zip文件
+        # 注意：当bundle_files=3时，不能设置zipfile=None
     )
 else:
     # 非Windows系统的备用配置

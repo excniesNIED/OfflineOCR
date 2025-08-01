@@ -57,6 +57,25 @@ try:
             os.environ['PATH'] = os.pathsep.join(new_paths) + os.pathsep + current_path
             print(f"已设置pypdfium2环境路径: {new_paths}")
             logging.info(f"已设置pypdfium2环境路径: {new_paths}")
+        
+            # 额外设置环境变量，确保pypdfium2能找到库文件
+            os.environ['PYPDFIUM2_LIBRARY_PATH'] = exe_dir
+            os.environ['PDFIUM_BINARY_PATH'] = pdfium_dll_path
+            logging.info(f"设置PYPDFIUM2_LIBRARY_PATH: {exe_dir}")
+            logging.info(f"设置PDFIUM_BINARY_PATH: {pdfium_dll_path}")
+            
+            # 强制设置当前工作目录包含pdfium.dll
+            try:
+                # 确认pdfium.dll在当前工作目录中存在
+                current_pdfium = os.path.join('.', 'pdfium.dll')
+                if not os.path.exists(current_pdfium):
+                    import shutil
+                    shutil.copy2(pdfium_dll_path, current_pdfium)
+                    logging.info(f"复制pdfium.dll到当前目录: {current_pdfium}")
+                    print(f"复制pdfium.dll到当前目录: {current_pdfium}")
+            except Exception as copy_e:
+                logging.warning(f"复制pdfium.dll失败: {copy_e}")
+                
         else:
             logging.warning(f"未找到pdfium库文件: {pdfium_dll_path}")
             
@@ -182,8 +201,31 @@ except Exception as e:
     raise
 
 # --- 全局设置 ---
-ctk.set_appearance_mode("System")
-ctk.set_default_color_theme("blue")
+try:
+    logging.info("设置CustomTkinter全局配置")
+    print("设置CustomTkinter全局配置")
+    
+    ctk.set_appearance_mode("System")
+    ctk.set_default_color_theme("blue")
+    
+    # 禁用特殊字体，使用系统默认字体
+    try:
+        # 设置默认字体为系统字体，避免加载外部字体文件
+        import tkinter.font as tkFont
+        default_font = tkFont.nametofont("TkDefaultFont")
+        ctk.CTkFont._family = default_font.actual()['family']
+        logging.info(f"使用系统默认字体: {default_font.actual()['family']}")
+        print(f"使用系统默认字体: {default_font.actual()['family']}")
+    except Exception as e:
+        logging.warning(f"设置默认字体失败，将使用CustomTkinter默认配置: {e}")
+        print(f"设置默认字体失败，将使用CustomTkinter默认配置: {e}")
+    
+    logging.info("CustomTkinter配置完成")
+    print("CustomTkinter配置完成")
+    
+except Exception as e:
+    logging.error(f"CustomTkinter配置失败: {e}", exc_info=True)
+    print(f"CustomTkinter配置失败: {e}")
 
 # 禁用PaddleOCR的日志输出
 logging.getLogger('ppocr').setLevel(logging.WARNING)
