@@ -64,6 +64,17 @@ try:
             logging.info(f"设置PYPDFIUM2_LIBRARY_PATH: {exe_dir}")
             logging.info(f"设置PDFIUM_BINARY_PATH: {pdfium_dll_path}")
             
+            # 设置更多环境变量供pypdfium2搜索
+            import ctypes
+            try:
+                # 尝试预加载pdfium.dll
+                ctypes.cdll.LoadLibrary(pdfium_dll_path)
+                logging.info(f"成功预加载pdfium.dll: {pdfium_dll_path}")
+                print(f"成功预加载pdfium.dll: {pdfium_dll_path}")
+            except Exception as load_e:
+                logging.warning(f"预加载pdfium.dll失败: {load_e}")
+                print(f"预加载pdfium.dll失败: {load_e}")
+            
             # 强制设置当前工作目录包含pdfium.dll
             try:
                 # 确认pdfium.dll在当前工作目录中存在
@@ -76,8 +87,59 @@ try:
             except Exception as copy_e:
                 logging.warning(f"复制pdfium.dll失败: {copy_e}")
                 
+            # 猴子补丁pypdfium2_raw的库搜索函数
+            try:
+                def patch_pypdfium2_library_search():
+                    """修补pypdfium2_raw的库搜索机制"""
+                    import sys
+                    if 'pypdfium2_raw.bindings' not in sys.modules:
+                        import pypdfium2_raw.bindings as bindings_module
+                        
+                        # 备份原始的_find_library函数
+                        original_find_library = bindings_module._find_library
+                        
+                        def patched_find_library():
+                            # 首先尝试在我们设置的路径中查找
+                            search_paths = [
+                                exe_dir,
+                                os.path.join(exe_dir, 'pypdfium2_raw'),
+                                '.'
+                            ]
+                            
+                            for search_path in search_paths:
+                                dll_path = os.path.join(search_path, 'pdfium.dll')
+                                if os.path.exists(dll_path):
+                                    logging.info(f"找到pdfium.dll: {dll_path}")
+                                    print(f"找到pdfium.dll: {dll_path}")
+                                    try:
+                                        return ctypes.cdll.LoadLibrary(dll_path)
+                                    except Exception as e:
+                                        logging.warning(f"加载pdfium.dll失败: {e}")
+                                        continue
+                            
+                            # 如果都失败，尝试原始方法
+                            return original_find_library()
+                        
+                        # 应用补丁
+                        bindings_module._find_library = patched_find_library
+                        logging.info("已应用pypdfium2库搜索补丁")
+                        print("已应用pypdfium2库搜索补丁")
+                        
+                patch_pypdfium2_library_search()
+                
+            except Exception as patch_e:
+                logging.warning(f"应用pypdfium2补丁失败: {patch_e}")
+                print(f"应用pypdfium2补丁失败: {patch_e}")
+                
         else:
             logging.warning(f"未找到pdfium库文件: {pdfium_dll_path}")
+            
+        # 设置CustomTkinter字体环境变量（在任何CustomTkinter导入之前）
+        os.environ['CTK_DISABLE_FONT_MANAGER'] = '1'
+        os.environ['CTK_USE_SYSTEM_FONT'] = '1'
+        os.environ['CTK_DISABLE_FONT_SHAPES'] = '1'
+        logging.info("已设置CustomTkinter字体环境变量")
+        print("已设置CustomTkinter字体环境变量")
             
 except Exception as e:
     print(f"初始化失败: {e}")
@@ -101,18 +163,34 @@ def setup_path_interception():
             def patched_exists(path):
                 """拦截CustomTkinter的路径检查，重定向到外部资源"""
                 if isinstance(path, str) and 'customtkinter' in path and 'assets' in path:
-                    if 'main.exe' in path and 'customtkinter' in path:
+                    # 处理main.exe内的路径
+                    if 'main.exe\\' in path:
                         corrected_path = os.path.join(exe_dir, path.split('main.exe\\')[-1])
-                        print(f"路径重定向: {path} -> {corrected_path}")
+                        print(f"路径重定向(main.exe): {path} -> {corrected_path}")
+                        logging.info(f"路径重定向(main.exe): {path} -> {corrected_path}")
+                        return original_exists(corrected_path)
+                    # 处理library.zip内的路径
+                    elif 'library.zip\\' in path:
+                        corrected_path = os.path.join(exe_dir, path.split('library.zip\\')[-1])
+                        print(f"路径重定向(library.zip): {path} -> {corrected_path}")
+                        logging.info(f"路径重定向(library.zip): {path} -> {corrected_path}")
                         return original_exists(corrected_path)
                 return original_exists(path)
             
             def patched_open(file, mode='r', **kwargs):
                 """拦截CustomTkinter的文件打开，重定向到外部资源"""
                 if isinstance(file, str) and 'customtkinter' in file and 'assets' in file:
-                    if 'main.exe' in file and 'customtkinter' in file:
+                    # 处理main.exe内的路径
+                    if 'main.exe\\' in file:
                         corrected_file = os.path.join(exe_dir, file.split('main.exe\\')[-1])
-                        print(f"文件打开重定向: {file} -> {corrected_file}")
+                        print(f"文件打开重定向(main.exe): {file} -> {corrected_file}")
+                        logging.info(f"文件打开重定向(main.exe): {file} -> {corrected_file}")
+                        return original_open(corrected_file, mode, **kwargs)
+                    # 处理library.zip内的路径
+                    elif 'library.zip\\' in file:
+                        corrected_file = os.path.join(exe_dir, file.split('library.zip\\')[-1])
+                        print(f"文件打开重定向(library.zip): {file} -> {corrected_file}")
+                        logging.info(f"文件打开重定向(library.zip): {file} -> {corrected_file}")
                         return original_open(corrected_file, mode, **kwargs)
                 return original_open(file, mode, **kwargs)
             
@@ -208,14 +286,65 @@ try:
     ctk.set_appearance_mode("System")
     ctk.set_default_color_theme("blue")
     
-    # 禁用特殊字体，使用系统默认字体
+    # 彻底禁用特殊字体，使用系统默认字体
     try:
         # 设置默认字体为系统字体，避免加载外部字体文件
         import tkinter.font as tkFont
         default_font = tkFont.nametofont("TkDefaultFont")
-        ctk.CTkFont._family = default_font.actual()['family']
-        logging.info(f"使用系统默认字体: {default_font.actual()['family']}")
-        print(f"使用系统默认字体: {default_font.actual()['family']}")
+        system_font_family = default_font.actual()['family']
+        
+        # 修补CustomTkinter的字体相关设置
+        if hasattr(ctk, 'CTkFont'):
+            ctk.CTkFont._family = system_font_family
+            
+        # 禁用字体形状渲染，强制使用简单的圆形渲染
+        try:
+            # 检查是否有字体渲染设置
+            import customtkinter.windows.widgets.font as ctk_font
+            if hasattr(ctk_font, 'CTkFont'):
+                # 强制设置为系统字体
+                ctk_font.CTkFont._family = system_font_family
+                # 禁用复杂字体渲染
+                if hasattr(ctk_font.CTkFont, '_preferred_drawing_method'):
+                    ctk_font.CTkFont._preferred_drawing_method = 'circle_shapes'
+        except ImportError:
+            pass
+            
+        # 设置环境变量禁用字体文件搜索
+        os.environ['CTK_DISABLE_FONT_MANAGER'] = '1'
+        os.environ['CTK_USE_SYSTEM_FONT'] = '1'
+        
+        # 禁用字体警告输出
+        try:
+            import warnings
+            # 禁用CustomTkinter字体相关的警告
+            warnings.filterwarnings("ignore", message=".*font.*", category=UserWarning)
+            warnings.filterwarnings("ignore", message=".*drawing method.*", category=UserWarning)
+            
+            # 修补可能的警告输出
+            def suppress_font_warnings(*args, **kwargs):
+                # 静默忽略字体警告
+                pass
+                
+            # 尝试替换可能的警告函数
+            try:
+                import customtkinter.windows.widgets.font as ctk_font_module
+                if hasattr(ctk_font_module, 'print'):
+                    original_print = ctk_font_module.print
+                    def filtered_print(*args, **kwargs):
+                        message = ' '.join(str(arg) for arg in args)
+                        if 'font_shapes' not in message and 'circle_shapes' not in message:
+                            original_print(*args, **kwargs)
+                    ctk_font_module.print = filtered_print
+            except (ImportError, AttributeError):
+                pass
+                
+        except Exception as warn_e:
+            logging.debug(f"字体警告禁用设置失败: {warn_e}")
+        
+        logging.info(f"使用系统默认字体: {system_font_family}")
+        print(f"使用系统默认字体: {system_font_family}")
+        
     except Exception as e:
         logging.warning(f"设置默认字体失败，将使用CustomTkinter默认配置: {e}")
         print(f"设置默认字体失败，将使用CustomTkinter默认配置: {e}")

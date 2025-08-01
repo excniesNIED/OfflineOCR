@@ -86,7 +86,7 @@ if sys.platform.startswith('win'):
         
         options={
             'py2exe': {
-                'bundle_files': 3,  # 3 = 不打包，所有文件保持为独立文件
+                'bundle_files': 1,  # 1 = 单文件打包，所有内容都在exe中
                 'compressed': True,
                 'optimize': 2,
                 'dist_dir': 'dist',
@@ -112,7 +112,7 @@ if sys.platform.startswith('win'):
             'icon_resources': [(1, 'app_icon.ico')] if os.path.exists('app_icon.ico') else []
         }],
         data_files=data_files,
-        # 注意：当bundle_files=3时，不能设置zipfile=None
+        zipfile=None,  # 不创建library.zip文件
     )
 else:
     # 非Windows系统的备用配置
