@@ -1,76 +1,8 @@
 from setuptools import setup
 import sys
 import os
-import shutil
 
-# --- 数据文件配置 ---
-data_files = []
-
-# 1. 添加模型文件
-models_dir = 'models'
-if os.path.exists(models_dir):
-    for root, dirs, files in os.walk(models_dir):
-        file_list = [os.path.join(root, file) for file in files]
-        if file_list:
-            data_files.append((root, file_list))
-
-# 2. 添加图标文件
-if os.path.exists('app_icon.ico'):
-    data_files.append(('.', ['app_icon.ico']))
-
-# 3. 关键：将整个 customtkinter 库作为数据文件复制
-try:
-    import customtkinter
-    ctk_path = os.path.dirname(customtkinter.__file__)
-    for root, dirs, files in os.walk(ctk_path):
-        file_list = [os.path.join(root, file) for file in files]
-        if file_list:
-            # 计算目标路径，保持目录结构
-            dest_path = os.path.join('customtkinter', os.path.relpath(root, ctk_path))
-            # 替换反斜杠以确保路径正确
-            data_files.append((dest_path.replace('\\', '/'), file_list))
-except ImportError:
-    print("警告: customtkinter 未找到，请确保已安装。")
-
-# 4. 添加pypdfium2相关的库文件 (根据网上解决方案)
-try:
-    import pypdfium2_raw
-    import pypdfium2
-    
-    # 复制pypdfium2_raw的所有文件
-    pypdfium2_raw_path = os.path.dirname(pypdfium2_raw.__file__)
-    print(f"找到pypdfium2_raw路径: {pypdfium2_raw_path}")
-    
-    # 复制整个pypdfium2_raw目录，保持完整结构
-    for root, dirs, files in os.walk(pypdfium2_raw_path):
-        file_list = [os.path.join(root, file) for file in files]
-        if file_list:
-            dest_path = os.path.join('pypdfium2_raw', os.path.relpath(root, pypdfium2_raw_path))
-            data_files.append((dest_path.replace('\\', '/'), file_list))
-    print(f"[OK] 添加完整的pypdfium2_raw目录结构")
-    
-    # 复制pypdfium2的所有文件 (特别是version.json)
-    pypdfium2_path = os.path.dirname(pypdfium2.__file__)
-    print(f"找到pypdfium2路径: {pypdfium2_path}")
-    
-    for root, dirs, files in os.walk(pypdfium2_path):
-        file_list = [os.path.join(root, file) for file in files]
-        if file_list:
-            dest_path = os.path.join('pypdfium2', os.path.relpath(root, pypdfium2_path))
-            data_files.append((dest_path.replace('\\', '/'), file_list))
-    print(f"[OK] 添加完整的pypdfium2目录结构")
-    
-    # 额外确保关键文件在根目录也有副本（保险起见）
-    pdfium_dll = os.path.join(pypdfium2_raw_path, 'pdfium.dll')
-    if os.path.exists(pdfium_dll):
-        data_files.append(('.', [pdfium_dll]))
-        print(f"[OK] 在根目录添加pdfium.dll副本")
-        
-except ImportError as e:
-    print(f"警告: pypdfium2相关库未找到: {e}")
-
-
-# --- py2exe 配置 ---
+# 检查py2exe是否安装
 if sys.platform.startswith('win'):
     try:
         import py2exe
@@ -78,48 +10,102 @@ if sys.platform.startswith('win'):
         print("错误：未安装 py2exe。请运行 'pip install py2exe'")
         sys.exit(1)
 
-    setup(
-        name='OfflinePDF-OCR',
-        version='1.0',
-        description='Offline PDF OCR Tool',
-        author='Your Name',
+# --- 数据文件收集函数 ---
+def find_data_files(source, target, patterns=None):
+    """一个健壮的函数，用于查找并复制数据文件，保持目录结构。"""
+    if not os.path.isdir(source):
+        print(f"警告: 源目录 '{source}' 不存在，跳过。")
+        return []
+    
+    if patterns is None:
+        patterns = ['*']
         
-        options={
-            'py2exe': {
-                'bundle_files': 1,  # 1 = 单文件打包，所有内容都在exe中
-                'compressed': True,
-                'optimize': 2,
-                'dist_dir': 'dist',
-                'packages': [
-                    'paddleocr',
-                    'paddle',
-                    'paddlex',
-                    'customtkinter',
-                    'pypdfium2',
-                    'pypdfium2_raw',
-                ],
-                'excludes': [
-                    'sklearn',
-                    'pysqlite2',
-                    'MySQLdb',
-                    'PyQt5',
-                    'matplotlib'
-                ],
-            }
-        },
-        windows=[{
-            'script': 'main.py',
-            'icon_resources': [(1, 'app_icon.ico')] if os.path.exists('app_icon.ico') else []
-        }],
-        data_files=data_files,
-        zipfile=None,  # 不创建library.zip文件
-    )
-else:
-    # 非Windows系统的备用配置
-    setup(
-        name='OfflinePDF-OCR',
-        version='1.0',
-        description='Offline PDF OCR Tool',
-        py_modules=['main'],
-        data_files=data_files
-    )
+    data_files_list = []
+    for root, dirs, files in os.walk(source):
+        for pattern in patterns:
+            for filename in files:
+                if pattern == '*' or filename.endswith(pattern) or os.path.splitext(filename)[1] in pattern:
+                    filepath = os.path.join(root, filename)
+                    rel_dir = os.path.relpath(root, source)
+                    dest_dir = os.path.join(target, rel_dir)
+                    data_files_list.append((dest_dir.replace('\\', '/'), [filepath]))
+    return data_files_list
+
+# --- 数据文件配置 ---
+data_files = []
+
+# 1. 添加模型文件
+print("正在收集PaddleOCR模型文件...")
+data_files.extend(find_data_files('models', 'models'))
+
+# 2. 添加图标文件
+if os.path.exists('app_icon.ico'):
+    data_files.append(('.', ['app_icon.ico']))
+    print("已添加图标文件。")
+
+# 3. 关键：将整个 customtkinter 库作为数据文件复制
+print("正在收集CustomTkinter库文件...")
+try:
+    import customtkinter
+    ctk_path = os.path.dirname(customtkinter.__file__)
+    # 复制所有文件，确保库的完整性
+    data_files.extend(find_data_files(ctk_path, 'customtkinter', patterns=['*']))
+    print(f"将完整的CustomTkinter库作为数据文件复制，源路径: {ctk_path}")
+except ImportError:
+    print("警告: customtkinter 未找到，相关资源文件将不会被打包。")
+
+# 4. 添加 PyMuPDF (pypdfium2) 相关的库文件
+print("正在收集PyMuPDF (pypdfium2)相关文件...")
+try:
+    import pypdfium2
+    pypdfium2_path = os.path.dirname(pypdfium2.__file__)
+    data_files.extend(find_data_files(pypdfium2_path, 'pypdfium2', patterns=['.dll', '.so', '.dylib', 'version.json']))
+
+    import pypdfium2_raw
+    pypdfium2_raw_path = os.path.dirname(pypdfium2_raw.__file__)
+    pdfium_dll_path = os.path.join(pypdfium2_raw_path, 'pdfium.dll')
+    if os.path.exists(pdfium_dll_path):
+        data_files.append(('.', [pdfium_dll_path]))
+        print(f"已将 '{pdfium_dll_path}' 添加到根目录。")
+    else:
+        print("警告: 未在pypdfium2_raw中找到pdfium.dll。")
+except ImportError as e:
+    print(f"警告: pypdfium2 或 pypdfium2_raw 未找到，PDF功能可能无法工作: {e}")
+
+
+# --- py2exe 配置 ---
+setup(
+    name='OfflinePDF-OCR',
+    version='1.0',
+    description='Offline PDF OCR Tool',
+    author='EPIBoly',
+    
+    options={
+        'py2exe': {
+            'bundle_files': 3,
+            'compressed': True,
+            'optimize': 2,
+            'dist_dir': 'dist',
+            'packages': [
+                'tkinter',
+                'paddleocr',
+                'pypdfium2',
+                'fitz',
+            ],
+            'includes': [
+                'pypdfium2_raw',
+            ],
+            'excludes': [
+                'customtkinter',  # 关键：禁止py2exe捆绑它
+                'PyQt5',
+                'matplotlib',
+            ],
+        }
+    },
+    windows=[{
+        'script': 'main.py',
+        'icon_resources': [(1, 'app_icon.ico')] if os.path.exists('app_icon.ico') else []
+    }],
+    data_files=data_files,
+    zipfile=None,  # 关键：禁止生成 library.zip
+)
